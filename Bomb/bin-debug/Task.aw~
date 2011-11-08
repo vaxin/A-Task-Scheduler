@@ -1,0 +1,16 @@
+package{
+    public class Task{
+        public var reachTime : Date;
+        public var game : String;
+        public var taskName : String;
+        public function Task(date:Date, game:String, taskName:String){
+            this.reachTime = date;
+            this.game = game;
+            this.taskName = taskName;
+        }
+        public function get reachTimeStr():String{
+            return this.reachTime.getFullYear() + '-' + this.reachTime.getMonth() + '-' + this.reachTime.getDate() + ' ' +
+                    this.reachTime.getHours() + ":" + this.reachTime.getMinutes();
+        }
+    }
+}

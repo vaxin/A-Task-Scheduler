@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Application xmlns:mx="http://www.adobe.com/2006/mxml" layout="vertical" verticalAlign="top"
+    horizontalAlign="center" backgroundGradientColors="[0x000000,0x323232]" paddingTop="0" viewSourceURL="srcview/index.html"
+    creationComplete="init()">
+    
+    <mx:Script>
+        <![CDATA[
+            import mx.collections.ArrayCollection;
+            [Bindable]
+            public var selectedItem:Object;
+
+            [Bindable]
+            
+            public var taskList : ArrayCollection = new ArrayCollection(new Array());
+            public function init():void{
+                taskList.addItemAt(new Task(new Date(), "abc", "def"), 0);
+            }
+            
+       ]]>
+    </mx:Script>
+
+
+    <mx:Model id="mystates">
+      <states>
+        <state label="Alabama" data="AL"/>
+        <state label="Alaska" data="AK"/>
+        <state label="Arizona" data="AZ"/>
+        <state label="Arkansas" data="AR"/>
+        <state label="California" data="CA"/>
+        <state label="Colorado" data="CO"/>
+        <state label="Connecticut" data="CT"/>
+      </states>
+    </mx:Model>
+    
+    <mx:Panel title="List Control" layout="vertical" color="0xffffff" borderAlpha="0.15"
+         paddingTop="2" paddingRight="10" paddingBottom="10" paddingLeft="10" horizontalAlign="center">
+         
+         <mx:Label color="0x323232" text="Select a state to see its abbreviation." />
+
+        <mx:List id="source" width="100%" color="0x0050AA" dataProvider="{taskList}" height="120" labelField="game"
+            change="this.selectedItem=List(event.target).selectedItem" />
+
+        <mx:VBox width="100%" color="0x323232">
+            <mx:Label text="Selected State: {selectedItem.label}"/>
+            <mx:Label text="State abbreviation: {selectedItem.data}"/>
+        </mx:VBox>
+        
+    </mx:Panel>
+</mx:Application>
