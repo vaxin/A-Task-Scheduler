@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Application xmlns:mx="http://www.adobe.com/2006/mxml"
+				xmlns:ns1="*"
+				width="374" height="251" layout="absolute" creationComplete="init()">
+	<mx:Script>
+		<![CDATA[
+			import mx.events.ToolTipEvent;
+			private function init():void{
+				
+			}
+			public function showTooltip(str:String, target : DisplayObject):void{
+				tooltip.setTooltip(str);
+				var p : Point = target.localToGlobal(new Point(0,0));
+				tooltip.x = p.x;
+				tooltip.y = p.y
+				this.tooltip.visible = true;
+			}
+			public function hideTooltip():void{
+				tooltip.visible = false;
+			}
+			private function onClick(e:MouseEvent):void{
+				showTooltip("ABCDEFG", DisplayObject(e.target));
+			}
+			private function onToolTipCreate(event:ToolTipEvent):void{
+				event.toolTip = tooltip;
+			}
+		]]>
+	</mx:Script>
+	<mx:Button id="show" x="155" y="189" label="Button" click="onClick(event)"/>
+	<ns1:MyTooltip id="tooltip" x="34" y="34" width="100" height="102" visible="false">
+	</ns1:MyTooltip>
+	<mx:Label text="----------上海滩这次真的在了，东山再起ADlskdjfjie02938)(*)@(%_(*@D" width="100" x="34" y="144" toolTipCreate="onToolTipCreate(event)"/>
+	
+</mx:Application>

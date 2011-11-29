@@ -1,0 +1,163 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Canvas  xmlns:mx="http://www.adobe.com/2006/mxml"
+			width="202" height="160" creationComplete="init()" xmlns:local="*">
+	<mx:Metadata>
+		[Event(name="CLOSE",type="flash.events.Event")]
+	</mx:Metadata>
+	<mx:Style>
+		List {
+			backgroundAlpha: 1;
+			backgroundColor: #154a9d;
+			useRollOver: true;
+			rollOverColor: #2a68c9;
+			textRollOverColor: #ffffff;
+			borderStyle: solid;
+			borderThickness: 1;
+			borderColor: #0e255c;
+			selectionColor: #2a68c9;
+			color: #ffffff;
+			textSelectedColor: #ffffff;
+			cornerRadius: 7;
+		}
+	</mx:Style>
+	<mx:Script>
+		<![CDATA[
+			import flash.net.navigateToURL;
+			
+			import mx.events.ToolTipEvent;
+			public static const DROP_FILTER :DropShadowFilter = new DropShadowFilter(0,0,0,0,0,0);
+			public var reminds : Array = new Array();
+			private var currentIndex : int = 0;
+			public function initremindList(remindList : Array):void{
+				for (var i : * in remindList){
+					this.reminds.push(remindList[i]);
+				}
+				refresh();
+			}
+			private function init():void{
+				var lso:LSO = Application.application.lso;
+				if (typeof(lso.get().whetherAlarm) == "undefined"){
+					//Alert.show('test');
+					lso.get().whetherAlarm = true;
+					this.whetherAlarm.selected = true;
+				}else{
+					this.whetherAlarm.selected = lso.get().whetherAlarm;
+				}
+			}
+				
+			public function pb(url:String):void{
+				var ur : URLRequest = new URLRequest(url);
+				try{
+					var loader:URLLoader = new URLLoader();
+					loader.load(ur);
+				}catch(e:Error){}
+			}
+			public function refresh():void{
+				if (this.reminds.length == 0){
+					onClose();
+					return;
+				}
+				if (this.reminds.length > this.currentIndex){
+					var remind : Remind = this.reminds[this.currentIndex];
+					this.header.text = remind.title;
+					this.content.htmlText = remind.content;
+				}
+				
+				this.page.text = "" + (this.currentIndex + 1) + "/" + this.reminds.length;
+				var remind : Remind = this.reminds[this.currentIndex];
+				if (remind.type == Remind.NEWLIST){
+					this.button.label = "查看";
+				}else{
+					this.button.label = "我知道了";
+				}
+			}
+			public function addRemind(remind:Remind):void{
+				Application.application.showReminder();
+				if (this.whetherAlarm.selected){
+					RemindSound.alarm();
+				}
+				this.reminds.push(remind);
+				this.currentIndex = this.reminds.length - 1;
+				refresh();
+			}
+			
+			private function onClose():void{
+				this.reminds = [];
+				this.dispatchEvent(new Event("CLOSE"));
+			}
+			
+			public function onPrev():void{
+				this.currentIndex--;
+				if (this.currentIndex < 0){
+					this.currentIndex = 0;
+				}
+				refresh();
+			}
+			public function onNext():void{
+				this.currentIndex++;
+				if (this.currentIndex >= this.reminds.length){
+					this.currentIndex = this.reminds.length - 1;
+				}
+				refresh();
+			}
+			public function iKnewIt():void{
+				var remind : Remind = this.reminds[this.currentIndex];
+				remind.data.read = true;
+				this.reminds.splice(this.currentIndex, 1);
+				if (this.currentIndex > this.reminds.length -1){
+					this.currentIndex = this.reminds.length -1;
+				}
+				remind.owner.IKnewIt(remind.data);
+				if (remind.type == Remind.NEWLIST){
+					if (remind.data.link && remind.data.link != null)
+						navigateToURL(new URLRequest(remind.data.link));
+					pb("http://pb.sogou.com/cl.gif?uigs_productid=wan&uigs_t="+Math.random()+"&m=2&uigs_version=v1.1&uigs_refer=gameskin&id=090006viewbutton");
+				}else{
+					pb("http://pb.sogou.com/cl.gif?uigs_productid=wan&uigs_t="+Math.random()+"&m=2&uigs_version=v1.1&uigs_refer=gameskin&id=090006okbutton");
+				}
+				refresh();
+				
+			}
+			import mx.core.Application;
+			public function onCheckBoxChange(event:Event):void{
+				var lso:LSO = Application.application.lso;
+				lso.get().whetherAlarm = this.whetherAlarm.selected;
+			}
+			
+			private function createCustomToolTip(event:ToolTipEvent):void {
+				event.toolTip = this.tooltip;
+			}
+		]]>
+	</mx:Script>
+<mx:Image source="@Embed(source='img/NoticeBg.png')" top="0" left="0"/>
+<local:MyTooltip id="tooltip" visible="false" />
+<mx:VBox width="100%" height="100%" paddingTop="0" paddingRight="0" paddingBottom="0" paddingLeft="0" verticalGap="0">
+	<mx:Canvas width="100%" height="25">
+		<mx:Label color="white" text="提醒" fontWeight="bold" fontSize="15" x="30" y="3" />
+		<mx:Button label="" x="165" top="10" right="15"
+					   upSkin="@Embed('img/CloseBtn.png')" 
+					   overSkin="@Embed('img/CloseBtn.png')"
+					   downSkin="@Embed('img/CloseBtn.png')" 
+					   focusSkin="@Embed('img/CloseBtn.png')"
+					   disabledSkin="@Embed('img/CloseBtn.png')"
+					   color="0x323232" textRollOverColor="0xffffff" textSelectedColor="0xffffff" paddingLeft="20"
+					   buttonMode="true" click="onClose()"/>
+	</mx:Canvas>
+	<mx:Canvas width="100%" height="133">
+		<mx:Label id="header" toolTipCreate="createCustomToolTip(event)" fontWeight="bold" x="13" y="8" width="178" text="abc" fontSize="14" color="black" filters="{[DROP_FILTER]}" />
+		<mx:Text id="content" x="10" y="28" width="178" height="45"  filters="{[DROP_FILTER]}" />
+		<mx:CheckBox id="whetherAlarm" toolTipCreate="createCustomToolTip(event)" label="声音提醒" x="10" y="100"  filters="{[DROP_FILTER]}" selected="true" change="onCheckBoxChange(event)"/>
+		<mx:Button  id="button" label="我知道了" x="45" y="70" width="84"
+				   upSkin="@Embed('img/AddBtn.png')"
+				   overSkin="@Embed('img/AddBtn.png')"
+				   downSkin="@Embed('img/AddBtn.png')"
+				   focusSkin="@Embed('img/AddBtn.png')"
+				   disabledSkin="@Embed('img/AddBtn.png')"
+				   color="0x001f4e" textRollOverColor="0x003688" textSelectedColor="0xffffff" paddingLeft="16"
+				   buttonMode="true" click="iKnewIt()" filters="{[DROP_FILTER]}" />
+		<mx:Image source="@Embed('img/Last.png')" id="previousBtn" x="107" y="107" width="12" height="12" click="onPrev()" buttonMode="true"/>
+		<mx:Label id="page" x="110" y="102" width="87" height="19" textAlign="center" text="1/22" filters="{[DROP_FILTER]}" />
+		<mx:Image source="@Embed('img/Next.png')" id="nextBtn" x="180" y="107" width="12" height="12" click="onNext()" buttonMode="true"/>
+	</mx:Canvas>
+</mx:VBox>
+</mx:Canvas>

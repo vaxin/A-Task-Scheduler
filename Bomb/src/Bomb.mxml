@@ -1,47 +1,190 @@
 <?xml version="1.0" encoding="utf-8"?>
-<mx:Application xmlns:mx="http://www.adobe.com/2006/mxml" layout="absolute" width="202" height="212" backgroundColor="0xFFFFFF" fontSize="12" creationComplete="init()"
-				paddingLeft="0" paddingTop="0" paddingRight="0" paddingBottom="0">
+<mx:Application xmlns:mx="http://www.adobe.com/2006/mxml"
+				xmlns:local="*"
+				width="202" height="212" backgroundAlpha="0.0" color="black"
+				creationComplete="init()" fontSize="12" layout="absolute" paddingBottom="0"
+				paddingLeft="0" paddingRight="0" paddingTop="0" implements="IRequester">
 	<mx:Style>
+		 global{
+			 paddingLeft:0;
+			 paddingRight:0;
+			 paddingBottom:0;
+			 paddingTop:0;
+			 themeColor:black;
+			 /*color:black;*/
+		 }
+		
+		VScrollBar {
+			width:4px;
+			upArrowSkin:ClassReference(null);
+			downArrowSkin:ClassReference(null);
+			thumbDownSkin:Embed(source="img/scrollbar.png");
+			thumbOverSkin:Embed(source="img/scrollbar_over.png");
+			thumbUpSkin:Embed(source="img/scrollbar.png");
+			trackSkin:Embed(source="img/scrollbar_track.png");
+		}
 		 .noPadding{
 			 paddingLeft:0;
 			 paddingRight:0;
 			 paddingBottom:0;
 			 paddingTop:0;
 			 borderStyle:none;
-			 themeColor:white;
+			 themeColor:black;
 		 }
+		
 		 TextInput{
 			paddingLeft:0;
 			paddingRight:0;
 			paddingBottom:0;
 			paddingTop:0;
 			borderStyle:none;
-			themeColor:white;
+			borderColor:#8dc4e4;
+			borderStyle: solid;
+			borderThickness: 1;
+			themeColor:#0096ef;
+			backgroundColor:#FFFFFF;
+			fontSize:11;
 		}
+		TabNavigator {
+			tabHeight: 19;
+			tabWidth: 77;
+			cornerRadius: 5;
+			/*horizontalAlign:center;*/
+			horizontalGap: 2;
+			tabOffset: 5;
+			paddingLeft: 0;
+			paddingRight: 0;
+			textIndent: 0;
+			backgroundAlpha: 1;
+			backgroundColor: #ecf4f9;
+			borderColor: #4571ac;
+			borderThickness: 1;
+			/*color: #003300;*/
+			color:black;
+			tabStyleName: "myTabs";
+			firstTabStyleName: "myTabs";
+			lastTabStyleName: "myTabs";
+			selectedTabTextStyleName: "mySelectedTabs";
+		}
+		List {
+			backgroundAlpha: 1;
+			backgroundColor: #154a9d;
+			useRollOver: true;
+			rollOverColor: #2a68c9;
+			textRollOverColor: #ffffff;
+			borderStyle: solid;
+			borderThickness: 1;
+			borderColor: #0e255c;
+			selectionColor: #2a68c9;
+			color: #ffffff;
+			textSelectedColor: #ffffff;
+			cornerRadius: 0;
+		}
+		
+		.myTabs {
+			fontWeight:normal;
+			fillColors: #d0e8f7, #9bcfed;
+			borderColor: #4571ac;
+			color: #000000;
+			textRollOverColor: #000000;
+		}
+		
+		.mySelectedTabs {
+			color: #000000;
+			textRollOverColor: #000000;
+		}
+		RadioButton {
+			textIndent: 0;
+			letterSpacing: 0;
+			highlightAlphas: 0, 0;
+			fillAlphas: 1, 1, 1, 1;
+			fillColors: #ffffff, #ffffff, #ffffff, #eeeeee;
+			borderColor: #8bc3e4;
+			color: #000000;
+			textSelectedColor: #000000;
+			textRollOverColor: #1662ca;
+			themeColor: #0066ff;
+			fontSize: 12;
+			fontWeight: normal;
+		}
+		.tooltip {
+			fontWeight:normal;
+			backgroundColor: black;
+			backgroundAlpha: 1.0;
+			fontSize:12px;
+			cornerRadius: 0;
+			color: white;
+		}
+		
 	</mx:Style>
 	<mx:Script>
 		<![CDATA[
-			import mx.events.ItemClickEvent;
-			import mx.collections.ArrayCollection;
-            import mx.collections.Sort;
-            import mx.controls.Alert;
+			import flash.system.fscommand;
 			
-
-            public function removeTask(data:Task):void{
+			import mx.collections.ArrayCollection;
+			import mx.collections.Sort;
+			import mx.controls.Alert;
+			import mx.controls.Text;
+			import mx.controls.ToolTip;
+			import mx.core.TextFieldAsset;
+			import mx.core.UITextField;
+			import mx.events.CollectionEvent;
+			import mx.events.ItemClickEvent;
+			import mx.events.ToolTipEvent;
+			public function init():void{
+				ExternalInterface.addCallback("ImeGetWindowPos",ImeGetWindowPos);
+				ExternalInterface.addCallback("ImeIsMovablePlace",ImeIsMoveablePlace);
+				ExternalInterface.addCallback("openBomb", openBombB);
+				flash.system.fscommand("fi_register_func", "openBomb");
+				
+				ExternalInterface.addCallback("openNewServerList", openNewServerListB);
+				flash.system.fscommand("fi_register_func", "openNewServerList");
+				//				flash.system.fscommand("fi_register_func", "closeBomb");
+				loadTaskList();
+				if (DEBUG){
+//					this.openNewServerListB(null);
+				}else{
+					this.closeBomb();
+				}
+				this.reminder.addEventListener("CLOSE", onReminderClose);
+				timer.addEventListener(TimerEvent.TIMER, check);
+				timer.start();
+				
+				this.tooltip.mouseEnabled= false;
+				this.addChildAt(this.tooltip, this.numChildren - 1);
+			}
+			public static const DEBUG :Boolean = false;
+			public static const DROP_FILTER :DropShadowFilter = new DropShadowFilter(0,0,0,0,0,0);
+			public function IKnewIt(task:Object):void{
+				if (task == this._tempTask){
+					this.addTempTask(null);
+				}
+				if (task.loopType == Task.FORK){
+					return;
+				}
+				var index : int = taskList.getItemIndex(task);
+				taskList.removeItemAt(taskList.getItemIndex(task));
+			}
+			public var tooltip : MyTooltip = new MyTooltip;
+			public function showTooltip(str:String, target : DisplayObject):void{
+				tooltip.setTooltip(str);
+				var p : Point = target.localToGlobal(new Point(0,0));
+				tooltip.x = p.x;
+				tooltip.y = p.y
+				this.tooltip.visible = true;
+			}
+			public function hideTooltip():void{
+				tooltip.visible = false;
+			}
+			
+            public function removeTask(data:Object):void{
+				if (data == this._tempTask){
+					this.addTempTask(null);
+				}
                 if (taskListView.selectedItem){
-                    //Alert.show('delete : ' + taskListView.selectedIndex);
                     taskList.removeItemAt(taskListView.selectedIndex);
                 }
-                /*
-                for(var i:int = 0;i<taskList.length;i++){
-                     if(taskList[i] == data){//taskListView.selectedItem){
-                            //Alert.show('delete : ' + i);
-                            taskList.removeItemAt(i);
-                      }
-                  }
-                */
             }
-            //54196
 
 			[Bindable] 
             public var weeks:ArrayCollection = new ArrayCollection( 
@@ -53,15 +196,140 @@
                   {label:"六", data:6},
                   {label:"日", data:7},  
                  ]); 
-                 
-            public function init():void{
-                var sort : Sort = new Sort;
-                sort.compareFunction = function(a:Task, b:Task):Boolean{
-                    return a.reachTime.getTime() >= b.reachTime.getTime();   
-                };
-                //taskList.sort = sort;
-                //taskList.refresh();
-            }
+            public var timer : Timer = new Timer(1000);
+			
+            
+			
+			public function onHeaderMouseOver(e:MouseEvent):void{
+				
+			}
+			
+			public function openBombB(txt:String):void{
+				this.mainPanel.visible = true;
+//				this.shouldVisible = true;
+				closeNewServerList(null);
+			}
+			
+			
+			public function closeBomb():void{
+				this.mainPanel.visible = false;
+//				this.shouldVisible = false;
+				addTempTask(null);
+			}
+			
+			public function openNewServerListB(txt:String):void{
+				this.newServerListPanel.visible = true;
+				this.newServer.load();
+				this.closeBomb();
+			}
+			
+			public function closeNewServerList(txt:String):void{
+				this.newServerListPanel.visible = false;
+			}
+			public var currentScreenX : Number = 0;
+			public var currentScreenY : Number = 0;
+			public function ImeGetWindowPos(param:String):String{
+				var arr : Array = param.split(',');
+				if (arr.length > 1){
+					var tmp : String = (arr[1] as String).substring(1,arr[1].length - 1);
+//					this.infoTime.text = param;
+					arr = tmp.split(',');
+					var x : Number = Number(arr[0]);
+					var y : Number = Number(arr[1]);
+					this.currentScreenX = x;
+					this.currentScreenY = y;
+				}
+				var _mx:Number,_my:Number;
+				var _tempArray:Array = param.split(",");
+				var _statusArray:Array = new Array();
+				_statusArray.push(Number(_tempArray[1].substring(2, _tempArray[1].length)));
+				_statusArray.push(Number(_tempArray[2]));
+				_statusArray.push(Number(_tempArray[3]));
+				_statusArray.push(Number(_tempArray[4].substring(0, _tempArray[4].length - 1)));
+				_statusArray.push(Number(_tempArray[5].substring(2, _tempArray[5].length)));
+				_statusArray.push(Number(_tempArray[6]));
+				_statusArray.push(Number(_tempArray[7]));
+				_statusArray.push(Number(_tempArray[8].substring(0, _tempArray[8].length - 1)));
+				
+				_mx = _statusArray[0] - 100;
+				_my = _statusArray[3] - 350;
+				var _returnString:String = "(" + _mx + "," + _my + ")";
+				return _returnString;
+			}
+			
+			public function ImeIsMoveablePlace(param:String):Number{
+				var arr : Array = param.split(',');
+				if (arr.length > 1){
+					var x : Number = Number(arr[0]) - this.currentScreenX;
+					var y : Number = Number(arr[1]) - this.currentScreenY;
+					if (y <= 30){
+						return 1;
+					}else{
+						return 0;//DIY
+					}
+				}
+				return 1;
+			}
+			
+			public function initReminder():void{
+				check(null);
+			}
+			public var remindList :Dictionary = new Dictionary;
+			private function check(e:TimerEvent):void{
+				for (var i : * in this.taskList){
+					var task : Object = this.taskList.getItemAt(i);
+					if (Task.hitTime(this.taskList.getItemAt(i))){
+						switch(task.loopType){
+							case Task.ONCE:
+								if (!task.sent){
+									task.sent = true;
+									this.reminder.addRemind(Task.genRemind(task, this));
+									
+								}
+								break;
+							case Task.DAILY:
+							case Task.WEEKLY:
+								if (!this.remindList[task]){
+									this.remindList[task] = true;
+									setTimeout(function(){
+										if (remindList[task])
+											delete remindList[task];
+									}, 60000 * 2);
+									var tt : Object = genTask(task.reachTime, task.game, task.taskName, Task.FORK);
+									this.reminder.addRemind(Task.genRemind(tt, this));
+								}
+								break;
+						}
+					}
+				}
+				refresh();
+			}
+//			private var shouldVisible : Boolean = true;
+			public function showReminder():void{
+				this.visible = true;
+				this.reminder.visible = true;
+				this.closeBomb();
+				this.closeNewServerList(null);
+			}
+			private function onReminderClose(event:*=null):void{
+				this.reminder.visible = false;
+				//temp
+//				this.visible = true;
+//				this.mainPanel.visible = true;
+			}
+			public var lso : LSO = new LSO;
+			
+			private function loadTaskList():void{
+				if (typeof(lso.get().taskArray) == "undefined"){
+					//Alert.show('test');
+					lso.get().taskArray = new Array();
+				}
+				this.taskArray = lso.get().taskArray;
+				this.taskList.source = taskArray;
+				refresh();
+				this.taskList.addEventListener(CollectionEvent.COLLECTION_CHANGE, refresh);
+				initReminder();
+			}
             
             public function onRemindTimeChange(e:ItemClickEvent):void{
             	 var value : String = e.currentTarget.selectedValue;
@@ -80,32 +348,62 @@
             	 	break;
             	 }
             	 weekLabel.visible = weekday.visible;
+				 yearLabel.visible = year.visible;
+				 month.visible = year.visible;
+				 day.visible = year.visible;
+				 monthLabel.visible = year.visible;
+				 dayLabel.visible = year.visible;
             }
 
-            public var taskArray : Array = [];
+            public var taskArray : Array = null;
             [Bindable]
-            public var taskList : ArrayCollection = new ArrayCollection(taskArray);
-            public function addTask(date : Date, gameName : String, taskName : String, loopType : int = Task.ONCE):void{
-                var task : Task = null;
-                for (var i : int = 0; i < taskList.length; i++){
-                    var tt : Number = date.getTime();
-                    if (tt < taskList.getItemAt(i).reachTime.getTime()){
-                        task = new Task(date, gameName, taskName);
-                        task.loopType = loopType;
-                        taskList.addItemAt(task, i);
-                        return;
-                    }
-                }
-                task = new Task(date, gameName, taskName);
-                task.loopType = loopType;
-                taskList.addItem(task);
+            public var taskList : ArrayCollection = new ArrayCollection();
+            public function addTask(date : Date, gameName : String, taskName : String, loopType : int = Task.ONCE):Task{
+				var task : Task = null;
+				for (var i : int = 0; i < taskList.length; i++){
+					var tt : Number = date.getTime();
+					if (tt < taskList.getItemAt(i).reachTime.getTime()){
+						task = genTask(date, gameName, taskName, loopType);
+						taskList.addItemAt(task, i);
+						addTempTask(task);
+						return task;
+					}
+				}
+				
+				task = genTask(date, gameName, taskName, loopType);
+				if (loopType == Task.DAILY){
+					task.hour = date.getHours();
+					task.minute = date.getMinutes();
+				}else if (loopType == Task.WEEKLY){
+					task.weekday = date.getDay();
+					task.hour = date.getHours();
+					task.minute = date.getMinutes();
+				}
+				this.taskList.addItem(task);
+				addTempTask(task);
+				return task;
             }
+			
+			public function genTask(date : Date, gameName : String, taskName : String, loopType : int = Task.ONCE):Task{
+				var task : Task = new Task(date, gameName, taskName);
+				task.loopType = loopType;
+				if (task.loopType == Task.DAILY){
+					task.hour = date.getHours();
+					task.minute = date.getMinutes();
+				}else if (task.loopType == Task.WEEKLY){
+					task.weekday = date.getDay();
+					task.hour = date.getHours();
+					task.minute = date.getMinutes();
+				}
+				return task;
+			}
+			
             public function addAbsoluteTask():void{
                 //compute date time
                 var y : int = parseInt(year.text);
-                var m : int = parseInt(month.text);
+                var m : int = parseInt(month.text) - 1;
                 var d : int = parseInt(day.text);
-                Alert.show("y:"+y+",m:"+m+",d:"+d);
+                //Alert.show("y:"+y+",m:"+m+",d:"+d);
                 var hour : int = parseInt(activityHour.text);
                 var minute : int = parseInt(activityMinute.text);
 
@@ -129,8 +427,10 @@
             	 	case "EveryWeek":
                         loopType = Task.WEEKLY;
                         //find next weekday
-                        var delta : int = (weekday.selectedItem.data + 7 - date.getDay() ) % 7;
-                        Alert.show(date.getDay() + '-' + weekday.selectedItem.data +'delta'+delta);
+						var wd : int = int(weekday.text);
+						wd = (wd == 7) ? 0 : wd;
+                        var delta : int = (wd + 7 - date.getDay() ) % 7;
+                        //Alert.show(date.getDay() + '-' + weekday.selectedItem.data +'delta'+delta);
                         date.setTime(date.getTime() + delta * 86400000);
             	 	break;
             	 }
@@ -138,6 +438,20 @@
                 date.setHours(hour);
                 date.setMinutes(minute);
                 date.setSeconds(0);
+				//trace('add date: ' + date);
+				var postTime : Number = -1;
+				if (Task.getMinutes(date) < Task.getNowMinutes()){
+					//trace(Task.getMinutes(date) + "VS" + Task.getNowMinutes());
+					if (loopType == Task.DAILY){
+						postTime = 86400000;
+					}else if (loopType == Task.WEEKLY){
+						postTime = 604800000;
+					}
+				}
+				if (postTime > 0){
+				//	trace("post");
+					date = new Date(date.getTime() + postTime);
+				}
                 addTask(date, name, task, loopType);
 
             }
@@ -151,12 +465,90 @@
 
                 addTask(targetDate, name, task);
             }
+			public function onMonthHourMinChange(e:*=null, start : int = 1, end : int = 12):void{
+				var m : int = int(e.target.text);
+				if (m < start || m > end){
+					e.target.parent.setStyle("color","red");
+				}else{
+					e.target.parent.setStyle("color","black");
+				}
+			}
+			private static const DAYS : Array = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+			public function isRunyear(year:int):Boolean{
+				return year % 4 == 0 && year % 100 != 0; 
+			}
+			public function onDayChange(e:*=null):void{
+				var m : int = int(this.month.text) -1 ;
+				var year : int = int(this.year.text);
+				var dat: int = int(this.day.text);
+				var d : int = DAYS[m];
+				if (m == 1 && isRunyear(year)){
+					d += 1;
+				}
+				if (dat <= 0 || dat > d){
+					this.day.setStyle("color","red");
+				}else{
+					this.day.setStyle("color","black");
+				}
+			}
+			
             public function onAddButtonClick(event:Event):void{
                 if (tab.selectedIndex == 0){
+					if (this.reverseHour.text == "" || this.reverseMinute.text == "")return;
+					if (this.reverseGameName.text == ""){
+						this.reverseGameName.text="游戏";
+					}
                     addRelativeTask();
+					this.reverseGameName.text = "";
+					this.reverseTaskName.text = "";
+					this.reverseHour.text = "0";
+					this.reverseMinute.text = "1";
                 }else if (tab.selectedIndex == 1){
+					var value : * = remindTime.selectedValue;
+					//Alert.show("value:"+value);
+					var yy : int = int(this.year.text);
+					var mm : int = int(this.month.text) - 1;
+					var dd : int = int(this.day.text);
+					var hh : int = int(this.activityHour.text);
+					var mi : int = int(this.activityMinute.text);
+					switch(value){
+						case "EveryTime":
+							if (mm < 1 || mm > 12)
+								return;
+							var sd : int = DAYS[mm-1];
+							if (mm == 2 && this.isRunyear(yy)){
+								sd ++;
+							}
+							if (dd < 1 || dd > sd){
+								return;
+							}
+							if (hh < 0 || hh > 24) return;
+							if (mi < 0 || hh > 60) return;
+							break;
+						case "EveryDay":
+							if (hh < 0 || hh > 24) return;
+							if (mi < 0 || hh > 60) return;
+							break;
+						case "EveryWeek":
+							if (hh < 0 || hh > 24) return;
+							if (mi < 0 || hh > 60) return;
+							break;
+					}
+					if (this.activityGameName.text == ""){
+						this.activityGameName.text="游戏";
+					}
                     addAbsoluteTask();
+					var now : Date = new Date(new Date().getTime() + 120000);
+					this.year.text = "" +now.getFullYear();
+					this.month.text = "" + (now.getMonth() + 1);
+					this.weekday.text = "" + (now.getDay() == 0 ? 7 : now.getDay());
+					this.day.text = ""+now.getDate();
+					this.activityGameName.text = "";
+					this.activityTaskName.text = "";
+					this.activityHour.text = ""+now.getHours();
+					this.activityMinute.text = ""+now.getMinutes();
                 }
+				
             }
 			
 			public function showList():void{
@@ -167,6 +559,125 @@
 				taskListViewPanel.visible = false;
 				addPanel.visible = true;
 			}
+			private var _tempTask : Object = null;
+			public function addTempTask(task:Object):void{
+				this._tempTask = task;
+				refresh();
+			}
+			
+			public function setInfoTime(str:String):void{
+				if (str == null){
+					this.infoTime.setStyle("fontSize", 12);
+					this.infoTime.text = "暂无任务";
+				}else{
+					this.infoTime.setStyle("fontSize", 11);
+					this.infoTime.text = str;
+				}
+			}
+			
+			public function getNextWeekTime(task:Object):Date{
+				var now : Date = new Date();
+				var delta : int = (weekday + 7 - now.getDay() ) % 7;
+				if (delta == 0){
+					if ( (task.reachTime.getHours() * 60 + task.reachTime.getMinutes()) < (now.getHours() * 60 + now.getMinutes()) ){
+						delta += 7;
+					}
+				}
+				now.setHours(task.reachTime.getHours());
+				now.setMinutes(task.reachTime.getMinutes());
+				return new Date(now.getTime() + delta * 24* 3600 * 1000);
+			}
+			
+			public function getDayTime(date:Date):Date{
+				var hour : int = date.getHours();
+				var min : int = date.getMinutes();
+				var now : Date = new Date();
+				var deltaMin : int = int(1440 + hour * 60 + min - (now.getHours() * 60 + now.getMinutes()) ) % 1440; 
+				return new Date(now.getTime() + deltaMin * 60000);
+			}
+			public function distance(now:Date, task:Object):Number{
+				if (task.loopType == Task.DAILY){
+					return Task.getMinutes(getDayTime(task.reachTime)) - Task.getMinutes(now);
+				}else if (task.loopType == Task.WEEKLY){
+					return Task.getMinutes(getNextWeekTime(task)) - Task.getMinutes(now);
+				}else if (task.loopType == Task.ONCE){
+					return Task.getMinutes(task.reachTime) - Task.getMinutes(now);
+				}
+				return -1;
+			}
+			public function willHappen():Object{
+				var minTask : Object = null;
+				var i : int = 0;
+				var minDis : Number = Number.POSITIVE_INFINITY;
+				var now : Date = new Date();
+				for (var i : int = 0; i < this.taskList.length; i++){
+					var task : Object = this.taskList.getItemAt(i);
+					var dis : Number = distance(now, task);
+					trace("dis:" + dis + "-" + task.reachTime);
+					if (dis > 0 && dis < minDis){
+						minTask = task;
+					}
+				}
+				return minTask;
+			}
+			
+			public function refresh(e:*=null):void{
+				this.taskListView.invalidateList();
+				if (_tempTask != null){
+					setInfoTime(Task.getTaskTimeStr(_tempTask));
+					this.infoGame.text = _tempTask.game;
+					this.infoGame.toolTip = _tempTask.game + "-" + _tempTask.taskName;
+					return;
+				}
+				var task:Object = willHappen();
+				if (task == null){
+					setInfoTime(null);
+//					this.infoTime.text = "暂无任务";
+					this.infoGame.text = "";
+				}else{
+					setInfoTime(Task.getTaskTimeStr(task));
+					this.infoGame.text = task.game;
+					this.infoGame.toolTip = task.game + "-" + task.taskName;
+				}
+			}
+			public function clearOutofdateTask():void{
+				var i : int = 0;
+				while (i < this.taskList.length){
+					var now : Number = Task.getNowMinutes();
+					var task : Object = this.taskList.getItemAt(i);
+					if (task.loopType == Task.ONCE && now >= Task.getMinutes(task.reachTime)){
+						taskList.removeItemAt(i);
+						i--;
+					}
+					i++;
+				}
+			}
+			
+			private function createCustomToolTip(event:ToolTipEvent):void {
+				event.toolTip = this.tooltip;
+			}
+			private function refreshList():void{
+				
+			}
+			
+			public function reverseInit():void{
+				
+			}
+			public function activityInit():void{
+				var now : Date = new Date(new Date().getTime() + 120000);
+				this.year.text = "" +now.getFullYear();
+				this.month.text = "" + (now.getMonth() + 1);
+				this.day.text = ""+now.getDate();
+				this.weekday.text = "" + (now.getDay() == 0 ? 7 : now.getDay());
+				this.activityGameName.text = "";
+				this.activityTaskName.text = "";
+				this.activityHour.text = ""+now.getHours();
+				this.activityMinute.text = ""+now.getMinutes();
+				
+			}
+			public function closeTheNewServerListPanel(e:Event):void{
+				this.closeNewServerList(null);
+			}
 		]]>
 	</mx:Script>
 	<!--
@@ -174,102 +685,213 @@
 	<mx:Button x="152.5" y="305" label="新服"/>
 	<mx:Button x="250" y="305" label="找游戏"/>
 	-->
-    <mx:Canvas id="taskListViewPanel" x="0" y="30" width="100%" height="182" visible="false" horizontalScrollPolicy="off" verticalScrollPolicy="off">
-			<mx:Button right="0" top="0" width="24" label="-" paddingLeft="0" paddingRight="0" click="hideList()"/>
-            <mx:List id="taskListView" x="0" y="24" width="100%" height="100%"
-					 dataProvider="{taskList}" fontSize="12">
-                <mx:itemRenderer>
+	
+	
+	<mx:Canvas id="mainPanel" width="100%" height="100%" backgroundImage="@Embed('img/Bg.png')" >
+    <mx:Canvas backgroundColor="0xb8d6ec" id="taskListViewPanel" x="4" y="30" width="193" height="178" visible="false" horizontalScrollPolicy="off" verticalScrollPolicy="off">
+		<mx:Canvas click="hideList()" buttonMode="true" styleName="noPadding" left="0" top="0" height="27">
+			<mx:Image source="@Embed('img/MessageBg.png')" top="2" left="1" height="27"/>
+			<mx:Button label="" right="10" top="7"
+					   upSkin="@Embed('img/ArrowUp.png')"
+					   overSkin="@Embed('img/ArrowUp.png')"
+					   downSkin="@Embed('img/ArrowUp.png')"
+					   focusSkin="@Embed('img/CloseBtnClick.png')" 
+					   disabledSkin="@Embed('img/ArrowUp.png')"
+					   color="0x323232" textRollOverColor="0xffffff" textSelectedColor="0xffffff" paddingLeft="20"
+					   />
+			<mx:Label x="10" y="5" text="提醒时间              游戏"  mouseChildren="false" width="145" id="infoTime0"  color="white" filters="{[DROP_FILTER]}"/>
+		</mx:Canvas>
+		
+            <local:MyList backgroundColor="0x154a9d"  id="taskListView" x="2" y="27" width="100%" height="127" color="white"
+					 dataProvider="{taskList}" fontSize="12" creationComplete="refreshList()" >
+                <local:itemRenderer>
                     <mx:Component>
-                        <mx:HBox width="100%" height="20" horizontalScrollPolicy="off" verticalScrollPolicy="off">
+                        <mx:Canvas width="100%" height="20" horizontalScrollPolicy="off" verticalScrollPolicy="off">
                         <mx:Script>
                         <![CDATA[
-                            import mx.controls.Alert;
-                            import mx.core.Application;
+							import mx.controls.Alert;
+							import mx.core.Application;
+							import mx.events.ToolTipEvent;
+							public static const DROP_FILTER :DropShadowFilter = new DropShadowFilter(0,0,0,0,0,0);
                             public function deleteCurrentItem(e:Event):void{
                                 Application.application.removeTask(data);
                             }
-                            
+							private var WEEK_DAXIE : Array = ["日","一","二","三","四","五","六"];
+                            public function getDaxie(day:int):String{
+								return WEEK_DAXIE[day];
+							}
                             override public function set data(value:Object):void{
                                 super.data = value;
                                 if (value==null)return;
+								
+								if (value.loopType == Task.ONCE && Task.getMinutes(value.reachTime) <= Task.getNowMinutes()){
+									realDate.setStyle("color",0x8eaad7);
+									realName.setStyle("color",0x8eaad7);
+								}else{
+									realDate.setStyle("color", 0xFFFFFF);
+									realName.setStyle("color", 0xFFFFFF);
+								}
+								
                                 if (value.loopType == Task.DAILY || value.loopType == Task.WEEKLY){
-                                    loop.selected = true;
+                                    loop.visible = true;
                                 }else{
-                                    loop.selected = false;
+                                    loop.visible = false;
                                 }
+								switch(value.loopType){
+									case Task.ONCE:
+										realDate.text = Task.getReachTimeStr(value.reachTime);
+										break;
+									case Task.DAILY:
+										realDate.text = "每天 " + value.reachTime.getHours() + ":" + value.reachTime.getMinutes(); 
+										break;
+									case Task.WEEKLY:
+										realDate.text = "每周" + getDaxie(value.reachTime.getDay()) + " " + value.reachTime.getHours() + ":" + value.reachTime.getMinutes(); 
+										break;
+								}
+							
                             }
-                           
+                            
+							private function createCustomToolTip(event:ToolTipEvent):void {
+								event.toolTip = Application.application.tooltip;
+							}
+							private function shownToolTip(event:ToolTipEvent):void{
+								if (Application.application.mainPanel.visible == false){
+									event.toolTip.visible = false;
+								}
+							}
                         ]]>
                         </mx:Script>
-                            <mx:CheckBox id="loop" styleName="noPadding" />
-                            <mx:Label text="{data.reachTimeStr}" width="80" />
-                            <mx:Label text="{data.game}" toolTip="{data.game}-{data.taskName}" width="50" />
+                            <mx:Image id="loop" top="5" source="@Embed('img/ListIcon.png')" />
+                            <mx:Label x="8" id="realDate" width="100" filters="{[DROP_FILTER]}" letterSpacing="-1" toolTipCreate="createCustomToolTip(event)" toolTipShown="shownToolTip(event)"/>
+                            <mx:Label x="108" id="realName" text="{data.game}" toolTip="{data.game}-{data.taskName}" width="64" letterSpacing="-1" filters="{[DROP_FILTER]}" toolTipCreate="createCustomToolTip(event)"/>
                             <!--<mx:Label text="{data.taskName}" width="20" />-->
-                            <mx:Button label="X" click="deleteCurrentItem(event)" />
-                        </mx:HBox>
+                            <!-- <mx:Button label="X" click="deleteCurrentItem(event)" />-->
+							<mx:Button label="" x="170" top="4"
+									   upSkin="@Embed('img/CloseBtn.png')" 
+									   overSkin="@Embed('img/CloseBtn.png')"
+									   downSkin="@Embed('img/CloseBtn.png')" 
+									   focusSkin="@Embed('img/CloseBtnClick.png')"
+									   disabledSkin="@Embed('img/CloseBtn.png')"
+									   color="0x323232" textRollOverColor="0xffffff" textSelectedColor="0xffffff" paddingLeft="20"
+									   click="deleteCurrentItem(event)" buttonMode="true"/>
+                        </mx:Canvas>
                     </mx:Component>
-                </mx:itemRenderer>
-            </mx:List>
-		<mx:Label x="10" y="2" text="Just Show List" width="115" id="infoTime0"/>
+                </local:itemRenderer>
+            </local:MyList>
+		
+		<mx:Button label="清除过期提醒"  x="40" y="155" height="20"
+				   upSkin="@Embed('img/ClearBtn.png')"
+				   overSkin="@Embed('img/ClearBtn.png')" 
+				   downSkin="@Embed('img/ClearBtn.png')"
+				   focusSkin="@Embed('img/ClearBtn.png')" 
+				   disabledSkin="@Embed('img/ClearBtn.png')"
+				   color="0x001f4e" textRollOverColor="0x003688" textSelectedColor="0xffffff" paddingLeft="8"
+				   click="clearOutofdateTask()" buttonMode="true" filters="{[DROP_FILTER]}"/>
     </mx:Canvas>
 
-	<mx:Label x="10" y="0" text="游戏定时"/>
+	<mx:Label x="10" y="0" text="游戏定时" filters="{[DROP_FILTER]}" visible="false" mouseChildren="false" mouseEnabled="false"/>
 	<mx:Canvas id="addPanel" x="0" y="0" width="100%" height="100%">
-        <mx:VBox  x="0" y="25" width="100%" height="100%" paddingTop="0" paddingBottom="0" paddingLeft="0" paddingRight="0">
-			<mx:Canvas width="100%" height="28">
-				<mx:Label x="0" y="3" text="2011/10/23 12:47" width="115" height="24" paddingBottom="0" paddingLeft="0" paddingRight="0" 
-						  paddingTop="0"  id="infoTime"/>
-				<mx:Label x="115" y="2" text="神仙道" width="40%" id="infoGame"/>
-				<mx:Button x="174" y="0" label="+" width="24" paddingLeft="0" paddingRight="0" click="showList()"/>
+        <mx:VBox  x="0" y="30" width="100%" height="100%" paddingTop="0" paddingBottom="0" paddingLeft="0" paddingRight="0">
+			<mx:Canvas width="100%" height="30" backgroundImage="@Embed('img/MessageBg.png')" click="showList()" buttonMode="true">
+				<mx:Label x="7" y="6" text="2011/10/23 12:47" width="118" height="24" paddingBottom="0" paddingLeft="0" paddingRight="0" 
+						  paddingTop="0"  id="infoTime" mouseChildren="false" fontSize="11" letterSpacing="-1" filters="{[DROP_FILTER]}" color="white"/>
+				<mx:Label x="102" y="5" text="神仙道" width="73" id="infoGame"
+						  color="0xFAE536"
+						  toolTipCreate="createCustomToolTip(event)"
+						  filters="{[DROP_FILTER]}" mouseChildren="false"/>
+				
+				<mx:Button label=""  x="174" y="8" 
+						   upSkin="@Embed('img/ArrowDown.png')"
+						   overSkin="@Embed('img/ArrowDown.png')" 
+						   downSkin="@Embed('img/ArrowDown.png')"
+						   focusSkin="@Embed('img/CloseBtnClick.png')" 
+						   disabledSkin="@Embed('img/ArrowDown.png')"
+						   color="0x323232" textRollOverColor="0xffffff" textSelectedColor="0xffffff" paddingLeft="20"
+						   />
 			</mx:Canvas>
-			<mx:TabNavigator width="100%" height="100%" id="tab" paddingTop="0" paddingRight="0" paddingBottom="0" paddingLeft="0">
-				<mx:Canvas label="倒计时" width="100%" height="100%">
-					<mx:Label x="8" y="6" text="游戏:"/>
-					<mx:Label x="7" y="30" text="任务:"/>
-					<mx:Label x="6" y="56" text="倒计时:"/>
-					<mx:TextInput id="reverseGameName" x="46" y="5" width="121" height="21"/>
-					<mx:TextInput id="reverseTaskName" x="47" y="30" width="121" height="21"/>
-					<mx:Label x="85" y="55" text="时" width="25"/>
-					<mx:TextInput id="reverseHour" x="56" y="56" width="25" height="19"/>
-					<mx:Label x="137.5" y="55" text="分 后提醒" width="62.5"/>
-					<mx:TextInput id="reverseMinute" x="104.5" y="56" width="25" height="19"/>
+			<mx:Canvas width="100%" height="100%">
+			<mx:TabNavigator left="7" width="189" height="96%" id="tab" filters="{[DROP_FILTER]}" paddingTop="0" tabHeight="22">
+				<mx:Canvas label="倒计时" width="100%" height="100%" horizontalScrollPolicy="off" verticalScrollPolicy="off" creationComplete="reverseInit()">	
+					<mx:Label x="8" y="2" text="游戏:" filters="{[DROP_FILTER]}"/>
+					<mx:Label x="7" y="28" text="任务:" filters="{[DROP_FILTER]}"/>
+					<mx:Label x="7" y="54" text="倒计时:" filters="{[DROP_FILTER]}"/>
+					<mx:TextInput id="reverseGameName" x="46" y="3" width="121" height="19" filters="{[DROP_FILTER]}"/>
+					<mx:TextInput id="reverseTaskName" x="46" y="29" width="121" height="19" filters="{[DROP_FILTER]}"/>
+					<mx:Label x="79" y="54" text="时" width="25" filters="{[DROP_FILTER]}"/>
+					<mx:TextInput id="reverseHour" x="53" y="55" width="25" height="19" 
+								  filters="{[DROP_FILTER]}" maxChars="2" restrict="0-9" text="0"/>
+					<mx:Label x="123.5" y="54" text="分后提醒" width="62.5" filters="{[DROP_FILTER]}"/>
+					<mx:TextInput id="reverseMinute" x="95.5" y="55" width="25" height="19"
+								  filters="{[DROP_FILTER]}" maxChars="2" restrict="0-9" text="1"/>
 				</mx:Canvas>
 				
-				<mx:Canvas label="活动定时" width="100%" height="100%">
-					<mx:Label x="8" y="7" text="游戏:"/>
-					<mx:Label x="8" y="31" text="任务:"/>
-					<mx:Label x="1" y="53" text="提醒时间:"/>
-					<mx:Label x="35" y="94" text="星期" id="weekLabel" visible="false"/>
+				<mx:Canvas label="活动定时" width="100%" height="100%" horizontalScrollPolicy="off" verticalScrollPolicy="off" creationComplete="activityInit()">
+					<mx:Label x="8" y="2" text="游戏:" filters="{[DROP_FILTER]}"/>
+					<mx:Label x="7" y="28" text="任务:" filters="{[DROP_FILTER]}"/>
+					<mx:Label x="-1" y="50" text="提醒时间:" filters="{[DROP_FILTER]}"/>
+					<mx:Label x="55" y="72" text="星期" id="weekLabel" visible="false" filters="{[DROP_FILTER]}"/>
 					
-					<mx:TextInput id="activityGameName" x="52" y="7" width="121" height="21"/>
-					<mx:TextInput id="activityTaskName" x="51" y="31" width="121" height="21"/>
+					<mx:TextInput id="activityGameName" x="46" y="3" width="121" height="19" filters="{[DROP_FILTER]}"/>
+					<mx:TextInput id="activityTaskName" x="46" y="29" width="121" height="19" filters="{[DROP_FILTER]}"/>
 					<mx:RadioButtonGroup id="remindTime" itemClick="onRemindTimeChange(event)"/>
-					<mx:RadioButton x="58" y="51" label="单次" value='EveryTime' groupName="remindTime" selected="true" horizontalGap="0"/>
-					<mx:RadioButton x="103" y="51" label="每天" value="EveryDay" groupName="remindTime" horizontalGap="0"/>
-					<mx:RadioButton x="148" y="51" label="每周" value="EveryWeek" groupName="remindTime" horizontalGap="0"/>
-					<mx:ComboBox x="12" y="78" width="50" id="weekday" dataProvider="{weeks}" visible="false" 
-							styleName="noPadding"></mx:ComboBox>
-					<mx:TextInput id="year" visible="true" x="3" y="76" width="40" height="22"
-								  maxChars="4" textIndent="0"/>
-					<mx:TextInput id="month" visible="true" x="53.5" y="76" width="24.5" height="22"
-								  maxChars="4" textIndent="0"/>
-					<mx:TextInput id="day" visible="true" x="87.5" y="76" width="29.5" height="22"
-								  maxChars="4" textIndent="0"/>
-					<mx:TextInput id="activityHour" x="126" y="76" width="22" height="22"
-								  maxChars="2"/>
-					<mx:TextInput id="activityMinute" x="158" y="76" width="26" height="22"
-								  maxChars="2"/>
-					<mx:Label x="145" y="77" text="时"/>
-					<mx:Label x="179" y="77" width="16" text="分"/>
-					<mx:Label x="38" y="77" text="年"/>
-					<mx:Label x="75" y="77" text="月"/>
-					<mx:Label x="110" y="77" text="日"/>
+					<mx:RadioButton x="56" y="47" label="单次" value='EveryTime' groupName="remindTime" selected="true" horizontalGap="0"/>
+					<mx:RadioButton x="99" y="47" label="每天" value="EveryDay" groupName="remindTime" horizontalGap="0"/>
+					<mx:RadioButton x="142" y="46" label="每周" value="EveryWeek" groupName="remindTime" horizontalGap="0"/>
+					<mx:TextInput x="85" y="72" width="18" height="20" id="weekday" 
+								  visible="false" paddingTop="0" paddingRight="0" paddingBottom="0" paddingLeft="0" 
+								  maxChars="1" restrict="1-7"/>
+					<mx:TextInput id="year" visible="true" x="1" y="72" width="36" height="19" letterSpacing="0"
+								  maxChars="4" textIndent="0" filters="{[DROP_FILTER]}" restrict="0-9"/>
+					<mx:TextInput id="month" visible="true" x="51.5" y="72" width="22" height="19" 
+								  maxChars="2" textIndent="0" filters="{[DROP_FILTER]}" restrict="0-9" keyUp="onMonthHourMinChange(event, 1, 12)" />
+					<mx:TextInput id="day" visible="true" x="85.5" y="72" width="22" height="19"
+								  maxChars="2" textIndent="0" filters="{[DROP_FILTER]}" restrict="0-9" keyUp="onDayChange(event)"/>
+					<mx:TextInput id="activityHour" x="118" y="72" width="22" height="19"
+								  maxChars="2" filters="{[DROP_FILTER]}" restrict="0-9" keyUp="onMonthHourMinChange(event, 0, 24)" />
+					<mx:TextInput id="activityMinute" x="153" y="72" width="22" height="19"
+								  maxChars="2" filters="{[DROP_FILTER]}" restrict="0-9" keyUp="onMonthHourMinChange(event, 0, 60)" />
+					<mx:Label x="139" y="73" text="时" filters="{[DROP_FILTER]}"/>
+					<mx:Label x="172" y="73" width="16" text="分" filters="{[DROP_FILTER]}"/>
+					<mx:Label x="37" y="73" text="年" id="yearLabel" filters="{[DROP_FILTER]}"/>
+					<mx:Label x="71" y="72" text="月" id="monthLabel" filters="{[DROP_FILTER]}"/>
+					<mx:Label x="105" y="73" text="日" id="dayLabel" filters="{[DROP_FILTER]}"/>
 					
 				</mx:Canvas>
 			</mx:TabNavigator>
+			</mx:Canvas>
 		</mx:VBox>
-		<mx:Button x="73.5" bottom="0" label="ADD" click="onAddButtonClick(event)"/>
+		<!--<mx:Button x="22.5" bottom="8" label="ADD" click="onAddButtonClick(event)"/>-->
+		<mx:Button label="添加" x="65" bottom="10" width="82" height="22" id="addBtn"
+				   upSkin="@Embed('img/AddBtn.png')"
+				   overSkin="@Embed('img/AddBtn.png')"
+				   downSkin="@Embed('img/AddBtn.png')"
+				   focusSkin="@Embed('img/AddBtn.png')" 
+				   disabledSkin="@Embed('img/AddBtn.png')" filters="{[DROP_FILTER]}"
+				   color="0x001f4e" textRollOverColor="0x003688" textSelectedColor="0xffffff" paddingLeft="10"
+				   click="onAddButtonClick(event)" buttonMode="true"/>
+		
 	</mx:Canvas>
-	<mx:Button right="0" top="0" label="X" width="36" height="10"/>
+		<mx:Button label=""  right="10" top="10"
+				   upSkin="@Embed('img/CloseBtn.png')"
+				   overSkin="@Embed('img/CloseBtn.png')"
+				   downSkin="@Embed('img/CloseBtn.png')"
+				   focusSkin="@Embed('img/CloseBtnClick.png')"
+				   disabledSkin="@Embed('img/CloseBtn.png')"
+				   color="0x323232" textRollOverColor="0xffffff" textSelectedColor="0xffffff" paddingLeft="20"
+				   click="closeBomb()" buttonMode="true"/>
+	</mx:Canvas>
 	
+	<local:Reminder bottom="0" id="reminder" visible="false" />
+	<mx:Canvas id="newServerListPanel" visible="false" backgroundImage="@Embed('img/coming.png')" width="100%" height="100%">
+		<local:NewListPanel id="newServer" width="100%" height="100%" reminder="{this.reminder}">
+		</local:NewListPanel>
+		<mx:Button label="" right="10" top="8"
+				   upSkin="@Embed('img/CloseBtn.png')" 
+				   overSkin="@Embed('img/CloseBtn.png')"
+				   downSkin="@Embed('img/CloseBtn.png')" 
+				   focusSkin="@Embed('img/CloseBtnClick.png')"
+				   disabledSkin="@Embed('img/CloseBtn.png')"
+				   color="0x323232" textRollOverColor="0xffffff" textSelectedColor="0xffffff" paddingLeft="20"
+				   click="closeTheNewServerListPanel(event)" buttonMode="true"/>
+	</mx:Canvas>
 </mx:Application>

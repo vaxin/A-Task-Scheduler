@@ -1,4 +1,4 @@
-package com.sogou.music.flash.store
+package
 {
 	import flash.events.NetStatusEvent;
 	import flash.net.SharedObject;
@@ -8,7 +8,7 @@ package com.sogou.music.flash.store
 	
 	public class LSOManager
 	{
-		public static const LOCATION : String = "SogouMusicRadio";
+		public static const LOCATION : String = "TaskSchedulerForInputMethod";
 		public function LSOManager()
 		{
 		}

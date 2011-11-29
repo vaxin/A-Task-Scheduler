@@ -1,0 +1,143 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Canvas xmlns:mx="http://www.adobe.com/2006/mxml"
+		   xmlns:ns1="*"
+		   width="196" height="209" implements="IRequester" creationComplete="init()">
+	<mx:Script>
+		<![CDATA[
+			import com.adobe.serialization.json.JSON;
+			import flash.utils.setTimeout;
+			import mx.controls.Alert;
+			import mx.core.Application;
+			import mx.events.ItemClickEvent;
+			import mx.rpc.events.FaultEvent;
+			
+			public var reminder : Reminder=null;
+			import mx.rpc.events.ResultEvent;
+			//private var timer : Timer = new Timer(600 * 1000);
+			private var news : Array;
+			private function init():void{
+				if (Bomb.DEBUG){
+					this.testButton.visible = true;
+				}
+				setTimeout(check, 10000);//(6 + Math.random() * 12) * 3600000 );
+				var lso : LSO = Application.application.lso;
+				if (typeof(lso.get().news) == "undefined"){
+					//Alert.show('test');
+					lso.get().news = [];
+				}
+				this.news = lso.get().news;
+				initNews();
+				
+				if (typeof(lso.get().whetherAlarm) == "undefined"){
+					//Alert.show('test');
+					lso.get().whetherAlarm = true;
+					this.whetherAlarm.selected = true;
+				}else{
+					this.whetherAlarm.selected = lso.get().whetherAlarm;
+				}
+			}
+			private var newsMap : Dictionary = new Dictionary;
+			private function initNews():void{
+				for (var i : * in this.news){
+					var n : Object = this.news[i];
+					if (typeof(n.id) != "undefined"){
+						this.newsMap[n.id] = true;
+					}
+				}
+			}
+			private function readNews(n:Object):void{
+				if (typeof(n.id) != "undefined"){
+					this.newsMap[n.id] = true;
+					if (!(n in this.news))
+						this.news.push(n);
+				}
+			}
+			private function check(e:TimerEvent=null):void{
+				this.getNews.url += "?_r="+Math.random();
+				this.getNews.send();
+				setTimeout( check, 10000);//12 * 3600000 );
+			}
+			public function load():void{
+				this.errorMsg.visible = false;
+				this.getNewServer.url += "?_r="+Math.random();
+				this.getNewServer.send();
+			}
+			private function checkNotifies(notifies:Array):void{
+				if (typeof(notifies) == "undefined" || notifies == null) return;
+				for (var i : * in notifies){
+					var notify : Object = notifies[i];
+					if (typeof(notify.id) != "undefined" && !(notify.id in this.newsMap)){
+						if (this.whetherAlarm.selected){
+							this.reminder.addRemind(
+								new Remind(
+									notify.title?notify.title: "新服",
+									notify.content?notify.content:"<a href=\"http://wan.sogou.com\">欢迎访问官网查看</a>",
+									this,
+									notify,
+									Remind.NEWLIST
+								)
+							);
+						}else{
+							this.readNews(notify);
+						}
+					}
+				}
+			}
+			private function onNewsResult(event:ResultEvent):void{
+				trace(event.result);
+				var obj : * = JSON.decode(event.result as String);
+				var notifies : Array =obj.notify;
+				checkNotifies(notifies);
+			}
+			private function onNewsFault():void{
+				//do nothing
+			}
+			
+			private function onResult(event:ResultEvent):void{
+				trace(event.result);
+				var obj : * = JSON.decode(event.result as String);
+				myList.dataProvider=obj.servers;
+				checkNotifies(obj.notifies);
+			}
+			private function onFault(e:FaultEvent):void{
+				Alert.show("" + e.message);
+				//show network error
+				this.errorMsg.visible = true;
+			}
+			public function IKnewIt(obj:Object):void{
+				this.readNews(obj);
+			}
+			private function test():void{
+				check(null);
+			}
+		]]>
+	</mx:Script>
+	<mx:HTTPService id="getNewServer" url="http://img.wan.sogou.com/static/imeskin/servers090006.json" result="onResult(event)" resultFormat="text" fault="onFault(event)"  />
+	<mx:HTTPService id="getNews" url="http://img.wan.sogou.com/static/imeskin/servers090006.json" result="onNewsResult(event)" resultFormat="text" fault="onNewsFault()"  />
+	<mx:Canvas id="errorMsg" visible="false" width="100%" height="100%">
+		<mx:Label text="网络错误，请稍后再试" x="20" y="100" filters="{[Bomb.DROP_FILTER]}" color="white" mouseChildren="false" mouseEnabled="false"/>
+	</mx:Canvas>
+	<!--<mx:Label x="0" y="10" width="100%" text="" filters="{[Bomb.DROP_FILTER]}"  mouseEnabled="false" mouseChildren="false"/>-->
+	<ns1:MyList x="10" y="36" width="90%" height="140" id="myList" >
+		<ns1:itemRenderer>
+			<mx:Component>
+				<mx:HBox click="onClick(event)" width="100%" horizontalScrollPolicy="off" verticalScrollPolicy="off" buttonMode="true">
+					<mx:Script>
+						<![CDATA[
+							import flash.net.navigateToURL;
+							private function onClick(e:MouseEvent):void{
+								navigateToURL(new URLRequest(data.url));
+							}
+						]]>
+					</mx:Script>
+					<mx:Label id="openTime" text="{data.date}" width="20%" mouseChildren="false" mouseEnabled="false"/>
+					<mx:Label id="gameName" text="{data.gname}" width="40%" mouseChildren="false" mouseEnabled="false" />
+					<mx:Label id="serverRegion" text="{data.sname}" width="40%" mouseChildren="false" mouseEnabled="false" />
+				</mx:HBox>
+			</mx:Component>
+		</ns1:itemRenderer>
+	</ns1:MyList>
+	<mx:Button id="testButton" label="test" click="test()"  x="0" y="178" visible="false"/>
+	<mx:CheckBox x="50" y="178" id="whetherAlarm" label="新服活动及提醒" filters="{[Bomb.DROP_FILTER]}"/>
+	
+</mx:Canvas>

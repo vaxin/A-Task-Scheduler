@@ -1,6 +1,5 @@
 package
 {
-	import com.sogou.music.flash.store.LSOManager;
 	
 	import flash.external.ExternalInterface;
 	import flash.utils.Dictionary;
@@ -11,21 +10,10 @@ package
 	 *  @author dengfanxin@sogou-inc.com
 	 *
 	 * */
-	public class LSO extends Application
+	public class LSO
 	{
-		private var readyTimer:Timer=new Timer(100);
-		private var isFlashReadyFunction : String = "";
-		private var iamReadyFunction : String = "";
 		public function LSO()
 		{
-		}
-		
-		override protected function initExternals():void{
-			ExternalInterface.addCallback("swfGet", get);
-			ExternalInterface.addCallback("swfPut", put);
-			ExternalInterface.addCallback("swfSave", save);
-			ExternalInterface.addCallback("swfGetMapValue", getMapValue);
-			ExternalInterface.addCallback("swfPutMapValue", putMapValue);
 		}
 		
 		/*********LSO Manager******************/
@@ -47,7 +35,7 @@ package
 		public function readObject():Object{
 			if (flashObject != null) return flashObject;
 			flashObject = LSOManager.read();
-			flashObject.data.userPref.map = new Dictionary;
+			//flashObject.data.userPref.map = new Dictionary;
 			return flashObject;
 		}
 		
